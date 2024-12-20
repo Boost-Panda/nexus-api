@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "nexus"
+version = "0.1.0"
+description = "API for document ingestion and similarity search"
+authors = ["Your Name <your.email@example.com>"]
+packages = [
+    { include = "app" }
+]
+
+[tool.poetry.dependencies]
+python = "^3.12"
+fastapi = "^0.110.0"
+uvicorn = "^0.28.0"
+pydantic = "^2.6.3"
+python-multipart = "^0.0.9"
+sentence-transformers = "^2.5.1"
+faiss-cpu = "^1.8.0"
+chardet = "^5.2.0"
+"pdfminer.six" = "^20231228"
+python-docx = "^1.1.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.1.1"
+black = "^24.2.0"
+isort = "^5.13.2"
+flake8 = "^7.0.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+
+[tool.isort]
+profile = "black"
+multi-line-output = 3 
