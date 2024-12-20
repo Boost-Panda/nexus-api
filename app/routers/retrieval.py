@@ -1,61 +1,51 @@
 from fastapi import APIRouter, HTTPException, Query
-from app.services.embeddings import search
-from app.services.storage import get_document_by_id
+from app.services.embeddings import search, model
+from app.services.memory_walker import MemoryWalker
+from app.services.query_refiner import QueryRefiner
 from typing import Optional, List, Dict
 
 router = APIRouter()
 
+# Initialize services
+memory_walker = MemoryWalker(model)
+query_refiner = QueryRefiner(model, memory_walker)
 
-@router.get("/{document_id}")
-async def get_document(document_id: int):
-    """
-    Get full document content and metadata by ID
-    """
-    document = get_document_by_id(document_id)
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return document
-
-@router.get("/", response_model=Dict)
-async def retrieve(
-    query: str = Query(..., min_length=1, description="Search query text"),
-    top_n: int = Query(default=5, ge=1, le=20, description="Number of results to return"),
-    include_content: bool = Query(default=False, description="Include full document content"),
-    chunk_size: int = Query(default=500, ge=100, le=2000, description="Size of text chunk to return")
+@router.get("/enhanced")
+async def enhanced_retrieve(
+    query: str = Query(..., description="Search query"),
+    top_n: int = Query(default=5, ge=1, le=20),
+    use_memory_tree: bool = Query(default=True),
+    refine_query: bool = Query(default=True)
 ):
     """
-    Search for documents with optional content retrieval
-    
-    Returns:
-    - query: Original search query
-    - results: List of matching documents with relevance scores
-    - total: Number of results found
+    Enhanced retrieval using MemoryWalker and query refinement
     """
     try:
+        if refine_query:
+            refined_query, confidence = await query_refiner.refine_query(query)
+            if confidence > 0.8:
+                query = refined_query
+        
         results = search(query, top_n)
         
-        if not results:
-            return {
-                "query": query,
-                "results": [],
-                "total": 0,
-                "message": "No matching documents found"
-            }
-            
-        if not include_content:
-            # Remove full content from response if not requested
-            for doc in results:
-                doc.pop("content", None)
+        if use_memory_tree:
+            # Enhance results with hierarchical context
+            for result in results:
+                memory_tree = memory_walker.build_memory_tree(result["content"])
+                result["context_hierarchy"] = _serialize_memory_tree(memory_tree)
         
         return {
             "query": query,
             "results": results,
-            "total": len(results),
-            "message": f"Found {len(results)} matching documents"
+            "total": len(results)
         }
-        
+    
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error during search: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
+
+def _serialize_memory_tree(node):
+    """Convert MemoryNode to JSON-serializable format"""
+    return {
+        "summary": node.summary,
+        "children": [_serialize_memory_tree(child) for child in node.children]
+    }
