@@ -41,4 +41,8 @@ poetry.lock
 # SQLite database
 *.db
 
+#bin
+*.bin
+
 venv/
+faiss_index.bin
